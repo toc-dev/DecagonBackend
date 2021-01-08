@@ -1,0 +1,22 @@
+﻿{% block title %} dashboard {% endblock %}
+
+{% block content %}
+
+<div>
+    <h3>Hello, {{ name["first"] }}</h3>
+</div>
+welcome to your dashboard, kindly sort through the user base
+<br />
+
+<div class="container">
+    <ul>
+        <li>name: {{ name["title"] + ' ' + name["first"] + ' ' + name["last"] }}</li>
+        <li> email: {{ email }}</li>
+        <li> phone: {{ phone }}</li>
+        <li>cell: {{ cell }}</li>
+        <li>registered: {{ registered }}</li>
+
+    </ul>
+</div>
+
+{% endblock %}
