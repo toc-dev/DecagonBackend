@@ -1,0 +1,53 @@
+﻿{% from "form_helper.html" import displayField %}
+
+
+
+{% block title %}Login {% endblock %}
+
+
+ {% block content %}
+
+<h1>Login Now!</h1>
+
+{% with messages = get_flashed_messages() %}
+        {% if messages %}
+
+    {% for message in messages %}
+<div class="alert alert-warning alert-dismissible" role="alert">
+    {{message}}
+</div>
+
+    {% endfor %}
+
+        {% endif %}
+     {% endwith %}
+
+
+
+
+<p>Enter username/password</p>
+
+<form action="{{ url_for('login')}}" , method="POST">
+
+    {{ displayField(form.username, 'Username', autocomplete="off", autofocus=true)}}
+    <p>
+        {{ displayField(form.password, 'Password')}}
+    </p>
+
+
+
+    <div>
+        {{ form.submit_button }}
+    </div>
+    {% if current_user.is_authenticated %}
+
+    Hi {{ curent_user.username }}
+
+    {% endif %}
+    {{ form.csrf_token }}
+</form>
+<div>
+    Not signed up yet? <a href={{url_for('index') }}>Sign Up</a>
+
+</div>
+    {% endblock %}

@@ -2,10 +2,35 @@
 This script runs the application using a development server.
 It contains the definition of routes and views for the application.
 """
-
+import os
 from flask import Flask, render_template, redirect, url_for, request, current_app
 from flask_session import Session
+from flask_sqlalchemy import SQLAlchemy
+from flask_migrate import Migrate
+from flask_bootstrap import Bootstrap
+from flask_login import LoginManager, login_user, login_required, logout_user, current_user
+from flask_wtf import Form, FlaskForm
+from flask_wtf.csrf import CSRFProtect
+from wtforms import TextField, BooleanField, PasswordField, SubmitField, validators, StringField, TextAreaField, RadioField
+from wtforms.validators import InputRequired, Length, EqualTo, Email, ValidationError, DataRequired
+from models import User
+
+db = SQLAlchemy()
+migrate = Migrate()
+
 app = Flask(__name__)
+app.secret_key = 'replace later'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'postgres://logyrzrjbnpwxv:268c35e00ea5eb3a14ba3bd1f6a41bd7e11cc98c10a7a2f2b1c9af0c50b95db5@ec2-34-204-121-199.compute-1.amazonaws.com:5432/degvjsokhihl0p'
+SQLALCHEMY_TRACK_MODIFICATIONS = False
+SQLALCHEMY_BINDS = False
+db = SQLAlchemy(app)
+app.debug = True
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login'
+csrf = CSRFProtect(app)
+csrf = CSRFProtect()
+
 import requests
 # Make the WSGI interface available at the top level so wfastcgi can get it.
 wsgi_app = app.wsgi_app
@@ -66,7 +91,7 @@ def index():
         session.commit()            
 
         return redirect(url_for('login'))
-    return render_template('login.html', form=reg_form)
+    return render_template('registration.html', form=reg_form)
 
 @login_manager.user_loader
 def user_loader(id):
@@ -99,7 +124,7 @@ def login():
         flash('Invalid credentials')
         return redirect(url_for('login'))
 
-    return render_template('sign_in.html', form=form)
+    return render_template('login.html', form=form)
 
 
 @app.route('/logout', methods=["GET", "POST"])
