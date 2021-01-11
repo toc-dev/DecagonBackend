@@ -6,6 +6,9 @@ import os
 from flask import Flask, render_template, redirect, url_for, request, current_app
 from flask_session import Session
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import create_engine
+from sqlalchemy.sql import text
+from sqlalchemy.orm import scoped_session, sessionmaker
 from flask_migrate import Migrate
 from flask_bootstrap import Bootstrap
 from flask_login import LoginManager, login_user, login_required, logout_user, current_user
@@ -13,7 +16,9 @@ from flask_wtf import Form, FlaskForm
 from flask_wtf.csrf import CSRFProtect
 from wtforms import TextField, BooleanField, PasswordField, SubmitField, validators, StringField, TextAreaField, RadioField
 from wtforms.validators import InputRequired, Length, EqualTo, Email, ValidationError, DataRequired
+import models
 from models import User
+from werkzeug.security import generate_password_hash, check_password_hash
 
 db = SQLAlchemy()
 migrate = Migrate()
@@ -23,6 +28,8 @@ app.secret_key = 'replace later'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'postgres://logyrzrjbnpwxv:268c35e00ea5eb3a14ba3bd1f6a41bd7e11cc98c10a7a2f2b1c9af0c50b95db5@ec2-34-204-121-199.compute-1.amazonaws.com:5432/degvjsokhihl0p'
 SQLALCHEMY_TRACK_MODIFICATIONS = False
 SQLALCHEMY_BINDS = False
+if not os.getenv("DATABASE_URL"):
+    raise RuntimeError("DATABASE_URL is not set")
 db = SQLAlchemy(app)
 app.debug = True
 login_manager = LoginManager()
@@ -30,7 +37,9 @@ login_manager.init_app(app)
 login_manager.login_view = 'login'
 csrf = CSRFProtect(app)
 csrf = CSRFProtect()
-
+engine = create_engine("postgres://logyrzrjbnpwxv:268c35e00ea5eb3a14ba3bd1f6a41bd7e11cc98c10a7a2f2b1c9af0c50b95db5@ec2-34-204-121-199.compute-1.amazonaws.com:5432/degvjsokhihl0p")
+Session = scoped_session(sessionmaker(bind=engine))
+session = Session()
 import requests
 # Make the WSGI interface available at the top level so wfastcgi can get it.
 wsgi_app = app.wsgi_app
@@ -107,7 +116,7 @@ class LoginForm(FlaskForm):
     submit_button = SubmitField('Login')
 
 
-@app.route('/signin', methods=['GET', 'POST'])
+@app.route('/login', methods=['GET', 'POST'])
 def login():
     # to prevent a logged in user from logging in again:
     if current_user.is_authenticated:
@@ -133,16 +142,10 @@ def logout():
     logout_user()
     return redirect(url_for('login'))
 
-@app.route('/search', methods=['GET', 'POST'])
-def search_page():
-        
-    return render_template("search.html")
 
 
 
-
-
-@app.route('/')
+@app.route('/dashboard')
 def dashboard():
     """Renders a sample page."""
     return render_template("dashboard.html")
