@@ -129,7 +129,7 @@ def login():
         if user:
             if check_password_hash(user.password, form.password.data):
                 login_user(user)
-                return redirect(url_for('search_page')) #we will redirect to search
+                return redirect(url_for('dashboard')) #we will redirect to dashboard
         flash('Invalid credentials')
         return redirect(url_for('login'))
 
@@ -141,8 +141,6 @@ def login():
 def logout():
     logout_user()
     return redirect(url_for('login'))
-
-
 
 
 @app.route('/dashboard')
