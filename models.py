@@ -22,26 +22,33 @@ class User(UserMixin, db.Model):
     password = db.Column(db.String(), nullable=False)
     email = db.Column(db.String(), unique=True, nullable=False)
 
+    role_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    user_wallet = relationship('Wallets', backref='wallet', lazy='dynamic')
+
 class Roles(UserMixin, db.Model):
     __tablename__ = "roles"
     id = db.Column(db.Integer, primary_key=True)
-    admin = db.column(db.String(25))
-    elite = db.column(db.String(25))
-    noob = db.column(db.String(25))
+    roles = db.column(db.String(25))
+    
+    user_role = relationship('RolePrivileges', backref='role_privilege', lazy='dynamic')
+   
 
 class Wallets(UserMixin, db.Model):
      __tablename__ = "wallets"
      id = db.Column(db.Integer, primary_key=True)
-     USD = db.Column(db.float)
-     GBP = db.Column(db.float)
-     EUR = db.Column(db.float)
-     JPY = db.Column(db.float)
+     currency = db.Column(db.float)
 
-class Functions(UserMixin, db.Model):
-    __tablename__ = "functions"
+     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+
+class Privileges(UserMixin, db.Model):
+    __tablename__ = "privileges"
     id = db.Column(db.Integer, primary_key=True)
-    user_functions = db.column(db.String)
+    user_privileges = db.column(db.String)
 
-class UserRoleFunction(UserMixin, db.Model):
+    role_privilege = relationship('RolePrivileges', backref='roles', lazy='dynamic')
+
+class RolePrivileges(UserMixin, db.Model):
      __tablename__ = "rolefunctions"
      id = db.Column(db.Integer, primary_key=True)
+     role_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+     privilege_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
