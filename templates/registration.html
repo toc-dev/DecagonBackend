@@ -24,15 +24,16 @@
     {{ displayField(form.password, 'Password')}}
     {{ displayField(form.confirm, 'Confirm Password')}}
     {{ displayField(form.email, 'Email')}}
+    {{ displayField(form.role, 'Role')}}
 
     <div>
         {{ form.submit_button }}
     </div>
     <br />
     <div>
-       Already signed up? <a href={{url_for('login') }}>login</a>
+        Already signed up? <a href={{url_for('login') }}>login</a>
     </div>
-            {{ form.csrf_token }}
+    {{ form.csrf_token }}
 </form>
 
     {% endblock %}

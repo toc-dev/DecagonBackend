@@ -19,6 +19,8 @@ from wtforms.validators import InputRequired, Length, EqualTo, Email, Validation
 import models
 from models import User
 from werkzeug.security import generate_password_hash, check_password_hash
+from flask_restful import Resource
+
 
 db = SQLAlchemy()
 migrate = Migrate()
@@ -69,6 +71,9 @@ class RegistrationForm(FlaskForm):
     confirm = PasswordField('Repeat Password', validators=[InputRequired(message="Password required"),
                                                            EqualTo('password', message="Passwords must match")])
 
+
+    role = RadioField('SELECT YOUR REGISTRATION PLAN?', choices=[(2, "ELITE"), (3, "NOOB")],  default=None, coerce=int)
+
     submit_button = SubmitField('Create')
 
     def validate_username(self, username):
@@ -93,9 +98,10 @@ def index():
         username = reg_form.username.data
         password = hashed_password
         email = reg_form.email.data
+        role = reg_form.role.data
 
         #adding user to DB
-        user = User(username=username, password=password, email=email)
+        user = User(username=username, password=password, email=email, role_id=role)
         session.add(user)
         session.commit()            
 
@@ -146,7 +152,13 @@ def logout():
 @app.route('/dashboard')
 def dashboard():
     """Renders a sample page."""
+    
     return render_template("dashboard.html")
+
+from models import Wallet
+class FundWalletApi(Resource):
+    def put(self, id):
+        body = request.get_json()
 
 if __name__ == '__main__':
     import os
