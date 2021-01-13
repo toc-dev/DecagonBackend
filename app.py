@@ -149,13 +149,31 @@ def logout():
     return redirect(url_for('login'))
 
 
-@app.route('/dashboard')
-def dashboard():
-    """Renders a sample page."""
+@app.route('/dashboard/<int:id>', methods={"POST"})
+def dashboard(id):
+    user = User.query.get(id)
+    "Choose Currency"
+    for u in user:
+        if u.role_id == 1:
+            t = "wait"
     
     return render_template("dashboard.html")
 
-from models import Wallet
+#from models import Wallet
+from flask_restful import Api
+#from resources.routes import initialize_routes
+class SignupApi:
+    def post(self):
+        body = request.get_json()
+        user = User(**body)
+        user.hash_password()
+        user.save()
+        id = user.id
+        return {'id': str(id)}, 200
+
+def initialize_routes(api):
+    api.add_resource(SignupApi, '/api/auth/login')
+
 class FundWalletApi(Resource):
     def put(self, id):
         body = request.get_json()
