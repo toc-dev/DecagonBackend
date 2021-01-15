@@ -3,6 +3,7 @@ This script runs the application using a development server.
 It contains the definition of routes and views for the application.
 """
 import os
+import datetime
 from flask import Flask, render_template, redirect, url_for, request, current_app
 from flask_session import Session
 from flask_sqlalchemy import SQLAlchemy
@@ -17,96 +18,79 @@ from flask_wtf.csrf import CSRFProtect
 from wtforms import TextField, BooleanField, PasswordField, SubmitField, validators, StringField, TextAreaField, RadioField
 from wtforms.validators import InputRequired, Length, EqualTo, Email, ValidationError, DataRequired
 import models
-from models import User
+from models import User, UserSchema
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_restful import Resource
+from flask_script import Manager
+from flask_jwt_extended import JWTManager, create_access_token
+csrf = CSRFProtect()
+#db = SQLAlchemy()
 
-
-db = SQLAlchemy()
-migrate = Migrate()
+user_schema = UserSchema()
+users_schema = UserSchema(many=True)
 
 app = Flask(__name__)
 app.secret_key = 'replace later'
+
 app.config['SQLALCHEMY_DATABASE_URI'] = 'postgres://logyrzrjbnpwxv:268c35e00ea5eb3a14ba3bd1f6a41bd7e11cc98c10a7a2f2b1c9af0c50b95db5@ec2-34-204-121-199.compute-1.amazonaws.com:5432/degvjsokhihl0p'
 SQLALCHEMY_TRACK_MODIFICATIONS = False
 SQLALCHEMY_BINDS = False
+JWT_SECRET_KEY = 'includelater'
+
+jwt = JWTManager(app)
 if not os.getenv("DATABASE_URL"):
     raise RuntimeError("DATABASE_URL is not set")
 db = SQLAlchemy(app)
+
 app.debug = True
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
-csrf = CSRFProtect(app)
-csrf = CSRFProtect()
+
 engine = create_engine("postgres://logyrzrjbnpwxv:268c35e00ea5eb3a14ba3bd1f6a41bd7e11cc98c10a7a2f2b1c9af0c50b95db5@ec2-34-204-121-199.compute-1.amazonaws.com:5432/degvjsokhihl0p")
 Session = scoped_session(sessionmaker(bind=engine))
 session = Session()
+#manager = Manager(app)
 import requests
 # Make the WSGI interface available at the top level so wfastcgi can get it.
 wsgi_app = app.wsgi_app
-
-def invalid_credentials(form, field):
-    """Username and password checker"""
-    username_entered = form.username.data
-    password_entered = field.password.data
-
-    # Check if credentials is valid
-    user_object = User.query.filter_by(username=username_entered).first()
-    if user_object is None:
-        raise ValidationError("One of the details is incorrect")
-       
-
-    elif password_entered != user_object.password:
-        raise ValidationError("One of the details is incorrect")
-
-
-class RegistrationForm(FlaskForm):
-
-    username = StringField('Username', validators=[InputRequired(message="Username required"), Length(min=4, max=20,
-                                                                               message="Username between 4 and 25 characters")])
-    email = TextField('Email', [validators.Length(min=6, max=50)])
-    password = PasswordField('Password', validators=[InputRequired(message="Password required"), Length(min=4, max=20,
-                                                                               message="Username between 4 and 25 characters")])
-    confirm = PasswordField('Repeat Password', validators=[InputRequired(message="Password required"),
-                                                           EqualTo('password', message="Passwords must match")])
-
-
-    role = RadioField('SELECT YOUR REGISTRATION PLAN?', choices=[(2, "ELITE"), (3, "NOOB")],  default=None, coerce=int)
-
-    submit_button = SubmitField('Create')
-
-    def validate_username(self, username):
-        user_object = User.query.filter_by(username=username.data).first()
-        if user_object:
-            raise ValidationError("Username already exists, please use a different username")
-    
-    def validate_email(self, email):
-        user_object = User.query.filter_by(email=email.data).first()
-        if user_object:
-            raise ValidationError("Email already exists, please use a different email")
+migrate = Migrate(app, db)
 
 
 
-@app.route("/", methods=['GET', 'POST'])
+@app.route("/", methods=['POST'])
 def index():
+    username = request.json['username']
+    email = request.json['email']
+    password = generate_password_hash(request.json['password'])
+    role_id = request.json['role_id']
 
-    reg_form = RegistrationForm()
-    # updates database on successful registration
-    if reg_form.validate_on_submit():
-        hashed_password = generate_password_hash(reg_form.password.data, method='sha256')
-        username = reg_form.username.data
-        password = hashed_password
-        email = reg_form.email.data
-        role = reg_form.role.data
+    user = User(username=username, password=password, email=email, role_id=role_id)
+    session.add(user)
+    session.commit() 
+    return user_schema.jsonify(user)
 
-        #adding user to DB
-        user = User(username=username, password=password, email=email, role_id=role)
-        session.add(user)
-        session.commit()            
+  
 
-        return redirect(url_for('login'))
-    return render_template('registration.html', form=reg_form)
+@app.route("/", methods=['GET'])
+def all_users():
+    all_users = User.query.all()
+    result = users_schema.dump(all_users)
+    return users_schema.jsonify(result)
+
+@app.route("/<id>", methods=['GET'])
+def one_user(id):
+    user = User.query.get(id)
+    return user_schema.jsonify(user)
+
+
+@app.route("/currency", methods=["POST"])
+def currency():
+    user = User.query.get(username)
+    for u in user:
+        a = 2
+    pass
+
 
 @login_manager.user_loader
 def user_loader(id):
@@ -121,26 +105,24 @@ class LoginForm(FlaskForm):
     password = PasswordField('password', validators=[InputRequired(message="Password required")])
     submit_button = SubmitField('Login')
 
-
-@app.route('/login', methods=['GET', 'POST'])
+from flask import request
+@app.route('/login', methods=['POST'])
 def login():
     # to prevent a logged in user from logging in again:
     if current_user.is_authenticated:
         return redirect(url_for('search_page'))
-    form = LoginForm()
     
     # Allow login if validation success
-    if form.validate_on_submit():
-        user = User.query.filter_by(username=form.username.data).first()
-        if user:
-            if check_password_hash(user.password, form.password.data):
-                login_user(user)
-                return redirect(url_for('dashboard')) #we will redirect to dashboard
-        flash('Invalid credentials')
-        return redirect(url_for('login'))
-
-    return render_template('login.html', form=form)
-
+   
+    body = request.get_json()
+    user = User.query.filter_by(username=body.get('username')).first() #email=body.get('email'), role_id=body.get('role_id'))
+    #user = User.query.filter_by(username=body.username.data).first()
+    authorized = check_password_hash(user.password, body.get('password'))
+    if not authorized:
+        return {'error': 'Username or password invalid'}
+    expires = datetime.timedelta(days=7)
+    access_token = create_access_token(identity=str(user.id), expires_delta=expires)
+    return {'token': access_token}, 200
 
 @app.route('/logout', methods=["GET", "POST"])
 @login_required
@@ -159,20 +141,12 @@ def dashboard(id):
     
     return render_template("dashboard.html")
 
-#from models import Wallet
-from flask_restful import Api
-#from resources.routes import initialize_routes
-class SignupApi:
-    def post(self):
-        body = request.get_json()
-        user = User(**body)
-        user.hash_password()
-        user.save()
-        id = user.id
-        return {'id': str(id)}, 200
+#from models import Wa
+
+
 
 def initialize_routes(api):
-    api.add_resource(SignupApi, '/api/auth/login')
+    api.add_resource(SignupApi, '/api/login')
 
 class FundWalletApi(Resource):
     def put(self, id):
