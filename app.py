@@ -22,7 +22,7 @@ from models import User, UserSchema
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_restful import Resource
 from flask_script import Manager
-from flask_jwt_extended import JWTManager, create_access_token
+from flask_jwt_extended import JWTManager, create_access_token, jwt_required
 csrf = CSRFProtect()
 #db = SQLAlchemy()
 
@@ -83,20 +83,11 @@ def one_user(id):
     user = User.query.get(id)
     return user_schema.jsonify(user)
 
-
-@app.route("/currency", methods=["POST"])
-def currency():
-    user = User.query.get(username)
-    for u in user:
-        a = 2
-    pass
-
-
 @login_manager.user_loader
-def user_loader(id):
+def user_loader(user_id):
     """Given *user_id*, return the associated Userobject"""
     #the current user is current_user.username remember this later while working with id
-    return User.query.get(int(id))
+    return User.query.get(int(user_id))
 
 class LoginForm(FlaskForm):
     """Login form"""
@@ -126,10 +117,47 @@ def login():
 
 @app.route('/logout', methods=["GET", "POST"])
 @login_required
+@jwt_required
 def logout():
     logout_user()
     return redirect(url_for('login'))
 
+@login_required
+@jwt_required
+@app.route("/<id>", methods=['PUT'])
+def update_user(id):
+    body = request.get_json()
+
+    user = User.query.get(id)
+
+    username = request.json['username']
+    password = request.json['password']
+    email = request.json['email']
+    role_id = request.json['role_id']
+
+    user.username = username
+    user.password = password
+    user.email = email
+
+    #curr_user_id = flask_login.current_user.id
+    user_id = current_user.get_id()
+    curr_user = User.query.get(user_id)
+    #if curr_user.role_id == 1:
+    if user_id == 1:
+        user.role_id = role_id
+    #else:
+    #    return {"error" : "you do not have the facilities for that, big man"}
+
+    db.session.commit()
+
+    return user_schema.jsonify(user)
+
+@app.route("/currency", methods=["POST"])
+def currency():
+    user = User.query.get(username)
+    for u in user:
+        a = 2
+    pass
 
 @app.route('/dashboard/<int:id>', methods={"POST"})
 def dashboard(id):
