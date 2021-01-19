@@ -30,8 +30,7 @@ class User(UserMixin, db.Model):
 
 class UserSchema(ma.Schema):
     class Meta:
-        fields = ('id', 'username', 'password', 'email')
-
+        fields = ('id', 'username', 'password', 'email', 'role_id')
 #init schema
 user_schema = UserSchema()
 users_schema = UserSchema(many=True)
@@ -52,15 +51,31 @@ class Currencies(UserMixin, db.Model):
     code = db.Column(db.Integer)
 
     wallet_currency = relationship('Wallets', backref='wallet_currency', lazy='dynamic')
+
+class CurrencySchema(ma.Schema):
+    class Meta:
+        fields = ('id', 'currency', 'code')
+#init schema
+currency_schema = CurrencySchema()
+currencies_schema = CurrencySchema(many=True)
+
+
 class Wallets(UserMixin, db.Model):
 
-     __tablename__ = "wallets"
+     __tablename__ = "wallet"
 
      id = db.Column(db.Integer, primary_key=True)
-     balance = db.Column(db.Float)
+     balance = db.Column(db.Float, default=0.00)
 
      user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
      currency_id = db.Column(db.Integer, db.ForeignKey('currency.id'), nullable=False)
+
+class WalletSchema(ma.Schema):
+    class Meta:
+        fields = ('id', 'balance', 'user_id', 'currency_id')
+#init schema
+wallet_schema = WalletSchema()
+wallets_schema = WalletSchema(many=True)
 
 class Privileges(UserMixin, db.Model):
 
