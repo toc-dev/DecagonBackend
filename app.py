@@ -90,22 +90,26 @@ def user_loader(user_id):
 from flask import request
 @app.route('/login', methods=['POST'])
 def login():
-    auth = request.authorization
-    if not auth or not auth.username or not auth.password:
-        return make_response("Could not verify user", 401, {'WWW-Authenticate': 'Basic realm=Login Required!"'})
+    body = request.get_json()
+    username = request.json['username']
+    password = request.json['password']
+
+    user = User.query.filter_by(username=username).first()
+    #authorized = user.check_password(password)
+    
     # to prevent a logged in user from logging in again:
     #if current_user.is_authenticated:
     #    return {'token': access_token}, 200
     
     # Allow login if validation success
    
-    body = request.get_json()
-    user = User.query.filter_by(username=auth.username).first() #email=body.get('email'), role_id=body.get('role_id'))
+
+     #email=body.get('email'), role_id=body.get('role_id'))
     #user = User.query.filter_by(username=body.username.data).first()
     #authorized = check_password_hash(user.password, body.get('password'))
     if not user:
-        return jsonify({'error': 'Username or password invalid'})
-    if check_password_hash(user.password, auth.password):
+        return jsonify({'error': 'Username or password invalid1'})
+    if check_password_hash(user.password, password):
         expires = datetime.timedelta(days=7)
         access_token = create_access_token(identity=str(user.id), expires_delta=expires)
         return {'token': access_token}, 200
@@ -163,11 +167,17 @@ def choose_currency():
     logged_in_id = get_jwt_identity()
     curr_user = User.query.get(logged_in_id)
     wallets = Wallets.query.all()
-    
+    print(curr_user.role_id)
     #query wallet
     #if curr_user's role_id is 3, and their user_id already has a currency_id
     #throw error
     #else: attach a currency for the wallet
+    if curr_user.id != user.id:
+        if curr_user.role_id == 1:
+            wallet = Wallets(user_id=user.id, currency_id=currency.id)
+            db.session.add(wallet)
+            db.session.commit()
+            return currency_schema.jsonify(wallet)
     if curr_user.id == user.id:
         if curr_user.role_id == 3:
             if curr_user.id in [w.user_id for w in wallets]:
@@ -175,22 +185,19 @@ def choose_currency():
                 return jsonify({"error" : "you cannot perform this action"})
             else:
                 wallet = Wallets(user_id=user.id, currency_id=currency.id)
+                db.session.add(wallet)
+                db.session.commit()
+                return currency_schema.jsonify(wallet)
         if curr_user.role_id == 2:
-            if (currency.id in [w.id for w in wallets]):
-                if curr_user.id in [w.user_id for w in wallets]:
-                #wallet = Wallets(user_id=user.id, currency_id=currency.id)
-                #check if wallet already has user in same currency
-                pass
-            pass
-    elif curr_user.role_id == 1:
-        wallet = Wallets(user_id=user.id, currency_id=currency.id)
-    else:
-        return jsonify({"error" : "you are not authorized to perform this action"})
+            wallet = Wallets(user_id=user.id, currency_id=currency.id)
+            db.session.add(wallet)
+            db.session.commit()
+            return currency_schema.jsonify(wallet)
+        if curr_user.role_id == 1:
+            return jsonify({"error": "admin cannot own wallet"})
+    return jsonify({"error" : "you are not authorized to perform this action"})
     
-    db.session.add(wallet)
-    db.session.commit()
-    return currency_schema.jsonify(wallet)
-
+    
 @app.route("/fundwallet/<id>", methods=['PATCH'])
 @jwt_required
 def fundWallet(id):
