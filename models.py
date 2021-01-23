@@ -65,7 +65,7 @@ class Wallets(UserMixin, db.Model):
      __tablename__ = "wallet"
 
      id = db.Column(db.Integer, primary_key=True)
-     balance = db.Column(db.Float, default=0.00)
+     balance = db.Column(db.Float)
 
      user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
      currency_id = db.Column(db.Integer, db.ForeignKey('currency.id'), nullable=False)

@@ -25,6 +25,8 @@ user_schema = UserSchema()
 users_schema = UserSchema(many=True)
 currency_schema = CurrencySchema()
 currencies_schema = CurrencySchema(many=True)
+wallet_schema = WalletSchema()
+wallets_schema = WalletSchema(many=True)
 
 app = Flask(__name__)
 app.secret_key = 'replace later'
@@ -177,7 +179,7 @@ def choose_currency():
             wallet = Wallets(user_id=user.id, currency_id=currency.id)
             db.session.add(wallet)
             db.session.commit()
-            return currency_schema.jsonify(wallet)
+            return wallet_schema.jsonify(wallet)
     if curr_user.id == user.id:
         if curr_user.role_id == 3:
             if curr_user.id in [w.user_id for w in wallets]:
@@ -187,24 +189,68 @@ def choose_currency():
                 wallet = Wallets(user_id=user.id, currency_id=currency.id)
                 db.session.add(wallet)
                 db.session.commit()
-                return currency_schema.jsonify(wallet)
+                return wallet_schema.jsonify(wallet)
         if curr_user.role_id == 2:
             wallet = Wallets(user_id=user.id, currency_id=currency.id)
             db.session.add(wallet)
             db.session.commit()
-            return currency_schema.jsonify(wallet)
+            return wallet_schema.jsonify(wallet)
         if curr_user.role_id == 1:
             return jsonify({"error": "admin cannot own wallet"})
     return jsonify({"error" : "you are not authorized to perform this action"})
     
-    
-@app.route("/fundwallet/<id>", methods=['PATCH'])
+
+#presently, I cannot prevent an elite user from reregistering the same currency
+#so I need to access the wallets through their usennames
+@app.route("/changecurrency", methods=['PATCH'])
 @jwt_required
-def fundWallet(id):
-    money = request.get_json()
+def change_currency():
     pass
 
+@app.route("/fundwallet", methods=['PATCH'])
+@jwt_required
+def fundWallet():
+    #get currency
+    #convert to Eur
+    #then convert to the user's currency 
 
+    username = request.json['username']
+    amount = request.json['amount']
+    currency = request.json['currency']
+
+    this_wallet_user = User.query.filter_by(username=username).first()
+    wallet = Wallets.query.filter_by(user_id=this_wallet_user.id).first()
+    logged_in_id = get_jwt_identity()
+    curr_user = User.query.get(logged_in_id)
+    currency_id = Currencies.query.get(wallet.currency_id)
+    this_wallet_user_currency = currency_id.currency
+    wallet_id = Wallets.query.get(wallet.id)
+
+    res = requests.get("https://data.fixer.io/api/convert", params={"access_key": "13af8fb312ee8e46fd999e4dd6538798", "from":currency, "to":this_wallet_user_currency, "amount":amount})
+    if res.status_code == 200:
+        data = res.json()
+        
+        amount_in = data['result']
+        rounded_amount = round(amount_in, 1)
+
+        new_balance = wallet_id.balance + float(rounded_amount)
+        wallet_id.balance = new_balance
+        
+    if curr_user.id != this_wallet_user.id:
+        if curr_user.role_id == 1:
+            db.session.commit()
+            return wallet_schema.jsonify(wallet_id)
+            
+            
+    if curr_user.id == this_wallet_user.id:
+        if curr_user.role_id == 3:
+            
+            wallet.balance = new_balance
+            db.session.commit()
+    
+            return {"status": "successor"}
+    #db.session.commit()
+    return {"error": "error"}
 
 class FundWalletApi(Resource):
     def put(self, id):
