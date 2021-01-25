@@ -14,7 +14,7 @@ from flask_migrate import Migrate
 from flask_bootstrap import Bootstrap
 from flask_login import LoginManager, login_user, login_required, logout_user, current_user
 import uuid
-from models import User, UserSchema, Wallets, WalletSchema, Currencies, CurrencySchema
+from models import User, UserSchema, Wallets, WalletSchema, Currencies, CurrencySchema, PendingApproval
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_restful import Resource
 from flask_script import Manager
@@ -123,33 +123,41 @@ def logout():
     logout_user()
     return redirect(url_for('login'))
 
-@app.route("/<id>", methods=['PUT'])
+@app.route("/update", methods=['POST'])
 @jwt_required
-def update_user(id):
+def update_user():
     body = request.get_json()
     logged_in_id = get_jwt_identity()
 
-    user = User.query.get(id)
+    
 
     username = request.json['username']
     password = request.json['password']
     email = request.json['email']
     role_id = request.json['role_id']
 
+    user = User.query.filter_by(username=username).first()
     user_id = current_user.get_id()
     print(user_id)
     curr_user = User.query.get(logged_in_id)
 
     if curr_user.role_id == 1:
+        print(curr_user.role_id)
         user.username = username
-        user.password = password
+        #user.password = password
         user.email = email
         user.role_id = role_id
+        db.session.merge(user)
+        db.session.commit()
+        return user_schema.jsonify(user)
     if curr_user.id == user.id:
         user.username = username
-        user.password = password
+        #user.password = password
         user.email = email
         user.role_id = user.role_id
+        db.session.merge(user)
+        db.session.commit()
+        return user_schema.jsonify(user)
     return {"error" : "you do not have the facilities for that, big man"}
 
     db.session.commit()
@@ -164,7 +172,7 @@ def choose_currency():
 
     user = User.query.filter_by(username=username).first()
     currency = Currencies.query.filter_by(currency=user_currency).first()
-
+    wallet = Wallets.query.filter_by(user_id=user.id).filter_by(currency_id=currency.id).first()
     
     logged_in_id = get_jwt_identity()
     curr_user = User.query.get(logged_in_id)
@@ -176,7 +184,14 @@ def choose_currency():
     #else: attach a currency for the wallet
     if curr_user.id != user.id:
         if curr_user.role_id == 1:
-            wallet = Wallets(user_id=user.id, currency_id=currency.id)
+            if user.role_id == 3:
+                if user.id in [w.user_id for w in wallets]:
+                    return jsonify({"error" : "you cannot perform this action"})
+            if user.role_id == 2:
+                if wallet is not None:
+                    return jsonify({"error" : "you have already registered this currency"})
+
+            wallet = Wallets(user_id=user.id, currency_id=currency.id, balance=0.00)
             db.session.add(wallet)
             db.session.commit()
             return wallet_schema.jsonify(wallet)
@@ -185,76 +200,165 @@ def choose_currency():
             if curr_user.id in [w.user_id for w in wallets]:
             #if wallet.currency_id is not None:
                 return jsonify({"error" : "you cannot perform this action"})
-            else:
-                wallet = Wallets(user_id=user.id, currency_id=currency.id)
-                db.session.add(wallet)
-                db.session.commit()
-                return wallet_schema.jsonify(wallet)
         if curr_user.role_id == 2:
-            wallet = Wallets(user_id=user.id, currency_id=currency.id)
-            db.session.add(wallet)
-            db.session.commit()
-            return wallet_schema.jsonify(wallet)
+            if wallet is not None:
+                    return jsonify({"error" : "you have already registered this currency"})
         if curr_user.role_id == 1:
             return jsonify({"error": "admin cannot own wallet"})
+        wallet = Wallets(user_id=user.id, currency_id=currency.id)
+        db.session.add(wallet)
+        db.session.commit()
+        return wallet_schema.jsonify(wallet)
     return jsonify({"error" : "you are not authorized to perform this action"})
     
 
-#presently, I cannot prevent an elite user from reregistering the same currency
-#so I need to access the wallets through their usennames
 @app.route("/changecurrency", methods=['PATCH'])
 @jwt_required
 def change_currency():
     pass
 
-@app.route("/fundwallet", methods=['PATCH'])
+@app.route("/fundwallet", methods=['POST'])
 @jwt_required
 def fundWallet():
-    #get currency
-    #convert to Eur
-    #then convert to the user's currency 
-
+    #try:
     username = request.json['username']
     amount = request.json['amount']
     currency = request.json['currency']
+    wallet_currency = request.json['wallet_currency']
 
-    this_wallet_user = User.query.filter_by(username=username).first()
-    wallet = Wallets.query.filter_by(user_id=this_wallet_user.id).first()
     logged_in_id = get_jwt_identity()
     curr_user = User.query.get(logged_in_id)
+    this_wallet_user = User.query.filter_by(username=username).first()
+    currency_in = Currencies.query.filter_by(currency=wallet_currency).first()
+    wallet_user = Wallets.query.filter_by(user_id=this_wallet_user.id).first()
+    
+
+    wallet = Wallets.query.filter_by(user_id=this_wallet_user.id).filter_by(currency_id=currency_in.id).first()       
+    print(wallet)
+    print(wallet.id)
+    if wallet is None:
+        if curr_user.id != this_wallet_user.id:
+            if curr_user.role_id == 1:
+                if this_wallet_user.role_id == 2:
+                    wallet = Wallets(user_id=this_wallet_user.id, currency_id=currency_in.id)
+                    db.session.add(wallet)
+                    db.session.commit()
+        if curr_user.id == this_wallet_user.id:
+            if curr_user.role_id == 2:
+                wallet = Wallets(user_id=this_wallet_user.id, currency_id=currency_in.id)
+                db.session.add(wallet)
+                db.session.commit()
+    
     currency_id = Currencies.query.get(wallet.currency_id)
     this_wallet_user_currency = currency_id.currency
-    wallet_id = Wallets.query.get(wallet.id)
 
     res = requests.get("https://data.fixer.io/api/convert", params={"access_key": "13af8fb312ee8e46fd999e4dd6538798", "from":currency, "to":this_wallet_user_currency, "amount":amount})
     if res.status_code == 200:
         data = res.json()
         
         amount_in = data['result']
-        rounded_amount = round(amount_in, 1)
-
-        new_balance = wallet_id.balance + float(rounded_amount)
-        wallet_id.balance = new_balance
+        rounded_amount = round(amount_in, 2)
         
     if curr_user.id != this_wallet_user.id:
         if curr_user.role_id == 1:
+            wallet.balance += rounded_amount
+            db.session.merge(wallet)
             db.session.commit()
-            return wallet_schema.jsonify(wallet_id)
-            
-            
-    if curr_user.id == this_wallet_user.id:
-        if curr_user.role_id == 3:
-            
-            wallet.balance = new_balance
-            db.session.commit()
-    
-            return {"status": "successor"}
-    #db.session.commit()
-    return {"error": "error"}
+            return wallet_schema.jsonify(wallet)
+        return {"error" : "you do not have the facilities to perfrom this action"}
 
-class FundWalletApi(Resource):
-    def put(self, id):
-        body = request.get_json()
+    if curr_user.id == this_wallet_user.id:
+        if this_wallet_user.role_id == 3:
+            pending_approval = PendingApproval(pending_balance=rounded_amount, wallet_id=wallet.id)
+            db.session.add(pending_approval)
+            db.session.commit()
+            return {"status": "pending_approval"}
+        wallet.balance += rounded_amount
+        db.session.merge(wallet)
+        db.session.commit()
+
+        return wallet_schema.jsonify(wallet)
+    
+    return {"error": "this wallet is not available to you"}
+    #except:
+    #    return {"error": "kindly cross-check your inputs"}
+
+@app.route("/withdraw", methods=['POST'])
+@jwt_required
+def withdraw():
+    try:
+        username = request.json['username']
+        amount = request.json['amount']
+        currency = request.json['currency']
+        wallet_currency = request.json['wallet_currency']
+
+        currency_id = Currencies.query.filter_by(currency=wallet_currency).first()
+        this_wallet_user = User.query.filter_by(username=username).first()
+        wallet = Wallets.query.filter_by(user_id=this_wallet_user.id).filter_by(currency_id=currency_id.id).first()
+        logged_in_id = get_jwt_identity()
+        curr_user = User.query.get(logged_in_id)
+        currency_id = Currencies.query.get(wallet.currency_id)
+        this_wallet_user_currency = currency_id.currency
+
+        res = requests.get("https://data.fixer.io/api/convert", params={"access_key": "13af8fb312ee8e46fd999e4dd6538798", "from":currency, "to":this_wallet_user_currency, "amount":amount})
+        
+        if res.status_code == 200:
+            data = res.json()
+        
+            amount_out = data['result']
+            rounded_amount = round(amount_out, 2)
+        if wallet.balance >= rounded_amount:
+            if curr_user.id != this_wallet_user.id:
+                if curr_user.role_id == 1:
+                    wallet.balance -= rounded_amount
+                    db.session.merge(wallet)
+                    db.session.commit()
+                    return wallet_schema.jsonify(wallet)
+                return {"error" : "you do not have the facilities to perfrom this action"}
+
+            if curr_user.id == this_wallet_user.id:
+                if curr_user.role_id == 3:
+                    wallet.balance -= rounded_amount
+                    db.session.merge(wallet)
+                    db.session.commit()
+
+                    return wallet_schema.jsonify(wallet)
+        else:
+            return {"error": "your balance is too low for this transaction"}
+        return {"error": "this wallet is not available to you"}
+    except:
+        return {"error": "kindly cross-check your inputs"}
+
+
+@app.route("/approve/<id>", methods=['POST'])
+@jwt_required
+def approve(id):
+    username = request.json['username']
+    approved = request.json['approved']
+
+    logged_in_id = get_jwt_identity()
+    curr_user = User.query.get(logged_in_id)
+
+    user = User.query.filter_by(username=username).first()
+    wallet = Wallets.query.filter_by(user_id=user.id).first()
+    approve = PendingApproval.query.get(id)
+
+    print(approve)
+    if curr_user.role_id == 1:
+        approve.approved = approved
+        if approve.approved is True:
+            wallet.balance+=approve.pending_balance
+            approve.pending_balance = 0.00
+            db.session.merge(approve)
+            db.session.merge(wallet)
+            db.session.commit()
+
+            return {"status": "approved"}
+        return {"status" : "not approved"}
+    return {"error": "you do not have the authority to make approval"}
+
+
+    
 
 if __name__ == '__main__':
     import os

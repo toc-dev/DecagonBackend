@@ -62,13 +62,15 @@ currencies_schema = CurrencySchema(many=True)
 
 class Wallets(UserMixin, db.Model):
 
-     __tablename__ = "wallet"
+     __tablename__ = "wallets"
 
      id = db.Column(db.Integer, primary_key=True)
-     balance = db.Column(db.Float)
+     balance = db.Column(db.Float, default=0.00)
 
      user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
      currency_id = db.Column(db.Integer, db.ForeignKey('currency.id'), nullable=False)
+
+     pending_wallet = relationship('PendingApproval', backref='pending_wallet', lazy='dynamic')
 
 class WalletSchema(ma.Schema):
     class Meta:
@@ -76,6 +78,13 @@ class WalletSchema(ma.Schema):
 #init schema
 wallet_schema = WalletSchema()
 wallets_schema = WalletSchema(many=True)
+
+class PendingApproval(UserMixin, db.Model):
+    __tablename__ = "pendingapproval"
+    id = id = db.Column(db.Integer, primary_key=True)
+    pending_balance = db.Column(db.Float)
+    approved = db.Column(db.Boolean, default=False)
+    wallet_id = db.Column(db.Integer, db.ForeignKey('wallets.id'), nullable=False)
 
 class Privileges(UserMixin, db.Model):
 
