@@ -1,4 +1,4 @@
-FROM python:alpine AS base
+FROM python:alpine:latest
 RUN apk add --no-cache python-dev \
 	&& pip install --pip
 
