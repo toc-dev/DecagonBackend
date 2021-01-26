@@ -42,8 +42,6 @@ class Roles(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     roles = db.Column(db.String(25))
     
-    user_role = relationship('RolePrivileges', backref='role_privilege', lazy='dynamic')
-   
 class Currencies(UserMixin, db.Model):
     __tablename__ = "currency"
     id = db.Column(db.Integer, primary_key=True)
@@ -85,26 +83,3 @@ class PendingApproval(UserMixin, db.Model):
     pending_balance = db.Column(db.Float)
     approved = db.Column(db.Boolean, default=False)
     wallet_id = db.Column(db.Integer, db.ForeignKey('wallets.id'), nullable=False)
-
-class Privileges(UserMixin, db.Model):
-
-    __tablename__ = "privileges"
-
-    id = db.Column(db.Integer, primary_key=True)
-    user_privileges = db.Column(db.String)
-
-    role_privilege = relationship('RolePrivileges', backref='roles', lazy='dynamic')
-
-class RolePrivileges(UserMixin, db.Model):
-
-     __tablename__ = "roleprivileges"
-
-     id = db.Column(db.Integer, primary_key=True)
-     role_id = db.Column(db.Integer, db.ForeignKey('roles.id'), nullable=False)
-     privilege_id = db.Column(db.Integer, db.ForeignKey('privileges.id'), nullable=False)
-
-#class Testing(UserMixin, db.Model):
-#    __tablename__ = "tests"
-#    id = db.Column(db.Integer, primary_key=True)
-#    test_string = db.Column(db.String)
-
